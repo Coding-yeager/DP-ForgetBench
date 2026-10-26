@@ -1,0 +1,55 @@
+experiment_name: multiclass_cnn_frozen_unlearning_secagg_eps32_r40_e5
+seed: 20260918
+
+data:
+  backend: cifar10_multiclass
+  dataset_root: data
+  download: false
+  n_clients: 100
+  samples_per_client: 200
+  heterogeneity_alpha: 0.5
+  audit_samples: 500
+  test_samples: 10000
+
+model:
+  name: small_groupnorm_cnn
+  num_classes: 10
+
+federated:
+  rounds: 40
+  local_epochs: 5
+  local_batch_size: 64
+  learning_rate: 0.05
+  client_sample_rate: 0.5
+  secure_aggregation: true
+
+privacy:
+  enabled: true
+  population_size: 100
+  delta: 1.0e-5
+  clip_norm: 1.0
+  noise_multiplier: 0.85629173
+  sampling: poisson
+  release_count: 1
+  secure_aggregation: true
+
+evaluation:
+  retrain_ensemble_size: 5
+  validity_threshold_invalid: 0.25
+  validity_threshold_warning: 0.40
+
+deletion:
+  kind: client
+  client_id: 2
+
+unlearning:
+  method: finetune_retained
+  rounds: 4
+  calibration_ratio: 0.5
+
+output:
+  root: results/frozen_unlearning_secagg_eps32_r40_e5
+
+notes: >
+  Frozen candidate with cryptographic Pairwise Zero-Sum Secure Aggregation
+  and full TC-UMIA (Fu et al., 2026) Tri-Population Privacy Audit.

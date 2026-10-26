@@ -1,0 +1,38 @@
+experiment_name: demo_secagg_tcumia
+seed: 20261015
+
+data:
+  n_clients: 12
+  samples_per_client: 80
+  n_features: 8
+  heterogeneity: 0.85
+  test_samples: 400
+
+federated:
+  rounds: 10
+  local_epochs: 1
+  local_batch_size: 16
+  learning_rate: 0.15
+  client_sample_rate: 0.5
+  secure_aggregation: true
+
+privacy:
+  enabled: true
+  population_size: 12
+  delta: 1.0e-5
+  clip_norm: 1.0
+  noise_multiplier: 1.1
+  sampling: poisson
+  release_count: 1
+  secure_aggregation: true
+
+deletion:
+  kind: client
+  client_id: 2
+
+unlearning:
+  method: finetune_retained
+  rounds: 4
+
+output:
+  root: results
