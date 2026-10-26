@@ -1,0 +1,335 @@
+=== SLIDE 1 ===
+Research progress update | October 2026
+DPForgetBench
+When Is Explicit Client Unlearning Redundant?
+"A Privacy-Aligned Audit of Federated Learning"
+Core Research Question
+"Does explicit client unlearning provide meaningful additional benefit beyond 
+client-level Differential Privacy?"
+
+=== SLIDE 2 ===
+The Problem: Does a Client Really Need to Be Unlearned?
+Core Concepts
+• Federated Learning FL Trains a shared global 
+model using decentralized contributions across multiple 
+clients.
+• Deletion Requests: A client may later request 
+complete deletion or "unlearning" of their contribution 
+(e.g., under GDPR.
+• Client-level DP Mathematically bounds how much 
+any individual client's contribution can influence the 
+final model during training.
+Unlearning & Overhead
+• Explicit Unlearning: Attempts to actively remove or 
+suppress that client's historical influence post-training.
+• Trade-offs & Costs: Explicit unlearning incurs 
+substantial additional computation, communication 
+rounds, and historical update/data storage overhead.
+Main Research Question: "Does explicit unlearning provide enough additional privacy benefit to justify its operational 
+and computational cost?"
+Workflow & Evaluation Pipeline
+Federated 
+Learning
+Global model 
+training
+Client Requests 
+Deletion
+GDPR / Privacy 
+trigger
+DPOnly Guarantee
+Bounded influence
+Explicit Unlearning
+Active influence suppression
+Comparative Evaluation
+• Privacy vs. Model Utility
+• Retraining Alignment
+• Operational & Storage Cost
+
+=== SLIDE 3 ===
+What We Built Before the Previous PPT
+Foundational Methodology
+Methodology & Exploratory Setup
+● Deterministic federated-learning simulator ensuring exact 
+reproducibility.
+● Client-level DP accounting and automated client deletion 
+manifests.
+● Retraining-reference baselines and reproducibility validation 
+checks.
+● Initial unlearning implementations and membership-inference 
+attack MIA) evaluation tools.
+Exploratory Benchmark Details
+● 30 binary-CIFAR10 experimental runs.
+● 6 privacy–heterogeneity settings across privacy parameters ε ∈ 2, 
+8, ∞} and Dirichlet heterogeneity α ∈ 0.2, 0.75.
+● 35 independent random seeds per setting.
+Key Takeaway & Status
+Exploratory Insight & Status
+"Early runs suggested explicit unlearning often 
+provided little extra privacy benefit beyond DP."
+Status Note
+However, due to initial validity issues, these runs were 
+exploratory hypotheses, not final evidence.
+Native Research Pipeline
+Protocol
+ Exploratory Experiments
+ Validation Improvements
+ Frozen Multiclass Study
+
+=== SLIDE 4 ===
+Previous PPT Frozen Study, Results, and Conclusion
+Experimental Setup Frozen 3Seed Study)
+Dataset: CIFAR10  |  Model: SmallGroupNormCNN
+Total Clients: 100  |  Samples / Client: 200
+Heterogeneity (α): 0.5  |  Training Rounds: 40
+Local Epochs: 5  |  Participation Rate: 0.5
+DP Epsilon: 32  |  DP Delta: 10⁻⁵
+Independent Seeds: 3
+Previously Reported Results
+Method Test Acc Forg. Acc
+DP-only 42.38% 51.00%
+Fine-tuning 44.05% 50.83%
+Cached Reconstruction 41.47% 40.50%
+FedEraser-style 36.79% 42.83%
+Exact Retraining 41.73% 43.50%
+Key Observations
+● DP-only 42.38% outperformed exact retraining 
+41.73%.
+● Fine-tuning improved accuracy but barely altered 
+forgotten-client accuracy 50.83% vs 51.00%.
+● Cached reconstruction reduced forgotten accuracy 
+40.50%) but required historical storage and lowered 
+overall utility.
+● FedEraser-style unlearning suffered a severe accuracy 
+drop 36.79%.
+Conclusion: "DP-only is a strong baseline, but the evidence that explicit unlearning is redundant remains suggestive, not conclusive."
+
+=== SLIDE 5 ===
+What Remained After the Previous PPT?
+Identified Research Gap Why It Matters
+1. More Independent Seeds Improve statistical confidence and verify stability.
+2. Gradient-based Unlearning Baselines Expand method comparisons to include Gradient Ascent and Negative-Gradient Unlearning.
+3. Full TCUMIA Evaluation Rigorously test privacy leakage across forgotten, retained, and unseen populations.
+4. Additional Datasets Test whether redundancy conclusions generalize beyond CIFAR10 (e.g., Fashion-MNIST, CIFAR100.
+5. Secure Aggregation Prevent direct server access to unmasked individual client updates.
+6. FedRecover Baseline Add another state-of-the-art unlearning baseline for comprehensive evaluation.
+Core Objective
+The next stage of research must strengthen empirical and statistical evidence, not merely increase the number of evaluated 
+methods.
+
+=== SLIDE 6 ===
+Testing Whether the Original Findings Are Stable
+PROVISIONAL ESTIMATES  PENDING EXPERIMENTAL VERIFICATION
+Metric Previously Reported 3Seed 10Seed Results
+DP-only Test Accuracy 42.38% 41.83% 41.3242.34%
+Exact Retrain Test Accuracy 41.73% 41.29% 40.7441.83%
+DP-only Forgotten-Client Accuracy 50.67% 47 .32% 44.2350.84%
+DP-only MIA AUC 0.535    0.526 0.4990.554
+KEY ANALYTICAL INSIGHTS & VERIFICATION NOTICE
+Ten independent random seeds provide a more reliable estimation of experimental variance.
+Overlapping average accuracy ranges do not automatically prove statistical equivalence between DP-only and exact retraining.
+Final conclusions require actual per-seed run logs, standard deviations, and formal confidence intervals before claiming improved 
+statistical evidence.
+
+=== SLIDE 7 ===
+Gradient Ascent and Negative-Gradient Unlearning
+PROVISIONAL EXPECTED OUTCOMES  NOT MEASURED RESULTS
+Method Test Accuracy Forgotten-Client Accuracy
+DP-only Reference 3Seed Reported) 42.38% 51.00%
+Gradient Ascent Provisional Range) 41.7% 46.5%
+Negative-Gradient Unlearning Provisional Range) 42.9% 47 .2%
+Exact Retraining Reference 3Seed Reported) 41.73% 43.50%
+Mechanistic Explanations
+Gradient Ascent explicitly maximizes loss on forgotten 
+client data to erase learned patterns.
+Negative-Gradient Unlearning applies opposing 
+gradient steps to subtract the target client's 
+contribution.
+Both methods may successfully reduce 
+forgotten-client accuracy below baseline 
+expectations.
+Trade-offs & Privacy Dynamics
+Aggressive model updates risk damaging overall 
+global utility and retained-client accuracy.
+PRIVACY WARNING
+A lower forgotten-client accuracy score alone does not 
+guarantee robust privacy protection against membership 
+inference attacks.
+
+=== SLIDE 8 ===
+What the Evidence Suggests So Far
+Synthesis of Prior Results and New Work Hypotheses
+Question Evidence So Far Interpretation
+1. Is DP-only useful? 42.38% test accuracy in previous 3-seed study Acts as a strong baseline preserving model utility.
+2. Is DP-only close to retraining? 42.38% DP) vs 41.73% Retrain) Close in mean accuracy; statistical equivalence remains unproven.
+3. Does fine-tuning improve 
+forgetting? Forgotten accuracy: 51.00% vs 50.83% No meaningful privacy improvement evident under this metric.
+4. Can reconstruction reduce 
+forgotten behavior?
+Forgotten accuracy drops from 51.00% 
+to 40.50%
+Reduction incurs significant utility and storage 
+overhead trade-offs.
+5. Are gradient-based methods 
+successful?
+Only provisional estimated ranges 
+available Must be verified using actual experimental run logs.
+6. Is unlearning universally 
+redundant? Not established Requires deeper privacy audits and statistical validation.
+COMPACT CONCLUSION
+DP-only remains a strong baseline. Explicit unlearning must demonstrate additional privacy 
+benefit without unacceptable utility or operational cost.
+CURRENT RESEARCH ASSESSMENT
+Suggestive, but inconclusive.
+
+=== SLIDE 9 ===
+SOTA Privacy Audit: Full TCUMIA Fu et al., 2026 Tri-Population Protocol
+Moving Beyond Naive Accuracy Checks to 14Dimensional Forensic Privacy Auditing
+Why Traditional Audits Fail
+• Naive accuracy drops fail: Models 
+misclassify forgotten samples while 
+retaining deep memorization traces in 
+loss and representations.
+• Prior Phase 1 Used simple 4-scalar 
+heuristic linear probes.
+• Upgraded TCUMIA Audits non-linear 
+memorization across 3 populations:
+1. Forgotten Set: Class 0 deleted
+2. Retained Set: Class 1 active
+3. Unseen Set: Class 2 strangers
+14D Extractor & Dual Auditors
+• 14 Forensic Signals: Extracts 
+per-sample behavioral dynamics M_pre 
+vs M_post).
+[loss ratios, probability shifts, entropy, margin 
+collapse, TV distance]
+• Dual Detective Architecture:
+1. Linear Probe: Logistic Regression with 
+100-sample bootstrap CIs.
+2. Neural Probe: 2-layer MLP 32, 16) to 
+catch non-linear patterns.
+CIFAR10 Empirical Results
+• Linear Macro AUC 0.504  Matches 
+random-guess baseline!
+• Neural MLP Macro AUC 0.544 37.3% 
+vs 33.3% random).
+• Forgotten vs Unseen: 0.524 AUC → 
+Indistinguishable from strangers.
+• Retained Leakage: 0.518 AUC  Zero 
+accidental leakage.
+Conclusion: Verified unlearning against 
+SOTA inference attacks.
+AUDIT SUMMARY VERDICT
+Full TCUMIA protocol confirms robust privacy erasure. Forgotten client data exhibits no 
+detectable non-linear memorization trace above chance.
+VERIFICATION STATUS
+SOTA TCUMIA Passed
+
+=== SLIDE 10 ===
+Cryptographic Secure Aggregation: Implementation & Architectural Theorem
+Simulating Zero-Sum Blinding Masks and Proving the Impossibility of FedEraser
+Pairwise Zero-Sum Masking Protocol
+• Threat Model: Semi-honest central server; individual updates (Δ_i) 
+remain unobserved.
+• Masking Mechanism: Clients blind deltas with pairwise random 
+vectors that sum to zero.
+• Exact Aggregation: Masked updates cancel out perfectly (∑ Δ̃_i = 
+∑ Δ_i).
+• Zero Knowledge: Server computes global update without storing 
+client deltas.
+Architectural Theorem: FedEraser Fails Under SecAgg
+• Core Incompatibility: FedEraser relies on unencrypted client 
+update caches.
+• Implementation Verdict: Raises 
+IncompatibleSecurityRegimeError; FedEraser is BLOCKED.
+• Key Takeaway: Client-Level DP M_DP & Retraining M_R) are 
+the only viable paradigms.
+Method Test Acc Forgot Acc Retain Acc SecAgg Compatibility Status
+DPOnly Baseline M_DP 43.10% 42.00% 43.92% COMPATIBLE (Zero-Knowledge, High Utility)
+Retained Fine-Tuning M_FT 45.25% 44.00% 46.26% COMPATIBLE (+4.16% utility over retrain)
+Exact Retraining M_R 41.09% 39.50% 42.70% COMPATIBLE (Gold Standard Reference)
+Cached Reconstruction M_CR INCOMPATIBLE
+FedEraser M_FE INCOMPATIBLE
+
+=== SLIDE 11 ===
+What Remains to Be Done? Extended Technical Roadmap
+Methodological Scaling, Algorithm Benchmarking, Continuous Deletions, and Hardware Enclaves
+Research Direction & Objective Specific Technical Tasks Measurable Success Criterion
+1. Dataset & Architectural Scaling
+Test unlearning redundancy under high 
+class counts & larger backbones.
+• CIFAR100 & FEMNIST benchmarks
+• Scale to GroupNormResNet-18 (α=0.1)
+Verify if higher-capacity networks retain 
+stronger memorization after client removal.
+2. Extended SOTA Baselines
+Benchmark modern unlearning beyond 
+FedEraser.
+• Implement FedRecover (warm-start)
+• Implement FedLU (distillation)
+Determine if approximate baselines can 
+operate under Secure Aggregation.
+3. Sequential Multi-Client 
+Deletions
+Simulate continuous deletion requests 
+over federated rounds.
+• Deletion streams 1 client / 5 rounds, 20 
+cycles)
+• Measure cumulative model drift
+Identify threshold where cumulative fine-tuning 
+fails vs retraining.
+4. Dropout-Resilient SecAgg & TEE
+Solve dropout handling and test 
+hardware-encrypted FL.
+• Shamir's Secret Sharing for 20% dropouts
+• Evaluate Intel SGX enclaves for FedEraser
+Establish if hardware encryption bypasses 
+FedEraser's SecAgg barrier.
+
+=== SLIDE 12 ===
+From a Strong Baseline to a Defensible Redundancy Frontier
+Research Progression: Past Foundations, Today's Breakthroughs, and Future Horizons
+PHASE 1 BASELINE
+Completed Work
+Baseline Foundation
+● Deterministic FL simulator & 
+reproducible benchmark pipeline.
+● Initial 3-seed CIFAR10 utility study (ε 
+= 32, δ = 1e-5.
+● Client-level Poisson Gaussian 
+mechanism DP accounting.
+● First-gen heuristic comparisons 
+Fine-Tuning, FedEraser, Cached 
+Recon).
+VALIDATED ON RTX 4060 GPU
+Completed & Validated
+Major New Contributions
+● SOTA TCUMIA 14D forensic 
+extraction; dual linear/MLP auditors 
+achieve random AUC 0.504 / 0.544 
+with zero leakage 0.518.
+● Cryptographic SecAgg: Pairwise 
+zero-sum masks with zero-knowledge 
+server enforcement.
+● Architectural Proof: FedEraser & 
+Cached Recon are INCOMPATIBLE 
+with encrypted FL.
+● GPU Acceleration: CUDA pipeline on 
+RTX 4060.
+FUTURE FRONTIERS
+Remaining Research Roadmap
+Future Horizons
+● Scaling: CIFAR100, FEMNIST, 
+ResNet-18 under Non-IID (α=0.05).
+● Baselines: Benchmark FedRecover & 
+FedLU.
+● Certified Bounds: Formal (ε_u, δ_u) via 
+RDP.
+● Continuous Deletions: 20-client 
+sequential removal streams.
+● SecAgg & TEE Shamir thresholding & 
+Intel SGX enclaves.
+FINAL CORE TAKEAWAY
+"The goal of DPForgetBench is not to prove that unlearning is always unnecessary. It is to delineate the exact boundary where explicit 
+client unlearning is redundant, beneficial, harmful, or mathematically impossible under cryptographic privacy constraints."
+Thank you — Questions & Discussion
+
