@@ -1,0 +1,55 @@
+{
+  "audit_standard": "TC-UMIA (Fu et al., 2026) Tri-Population Privacy Audit",
+  "config_path": "configs\\demo_secagg_tcumia.yaml",
+  "config_sha256": "45a468799bd157378bbd09a98cb2da1e4955bc8687a80ad9b339222e44a69c39",
+  "deletion_manifest": "partitions\\generated\\deletion_c51fe295e079121d.csv",
+  "deletion_manifest_sha256": "c51fe295e079121d822f6eb7c0ca694ab1d99ceda9e5a43184e09cd2f8a672d7",
+  "deletion_requests": [
+    {
+      "client_id": 2,
+      "fraction": 1.0,
+      "request_index": 0
+    }
+  ],
+  "effective_privacy_config": {
+    "clip_norm": 1.0,
+    "delta": 1e-05,
+    "enabled": true,
+    "noise_multiplier": 1.1,
+    "population_size": 12,
+    "release_count": 1,
+    "sampling": "poisson",
+    "secure_aggregation": true
+  },
+  "experiment_name": "demo_secagg_tcumia",
+  "limitations": [
+    "Phase 0 synthetic data only; not a benchmark result.",
+    "Fine-tuning accesses retained raw data and is not DP post-processing.",
+    "Tri-population unlearning audit complies with TC-UMIA (Fu et al., 2026) multi-feature protocol.",
+    "Pairwise zero-sum Secure Aggregation active: individual client updates cryptographically concealed."
+  ],
+  "method_privacy_class": {
+    "cached_update_reconstruction_baseline": "incompatible with SecAgg",
+    "dp_only_no_action": "final-model client-DP mechanism as recorded in privacy_ledger.json; compatible with SecAgg",
+    "federated_eraser_baseline": "incompatible with SecAgg",
+    "full_model": "pre-deletion model trained on all clients",
+    "retained_finetune_baseline": "accesses retained raw data after request; compatible with SecAgg",
+    "target_retrain": "internal retained-data retrain reference; compatible with SecAgg"
+  },
+  "platform": "Windows-10-10.0.26200-SP0",
+  "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+  "reference_privacy_config": {
+    "clip_norm": 1.0,
+    "delta": 1e-05,
+    "enabled": true,
+    "noise_multiplier": 1.1,
+    "population_size": 11,
+    "release_count": 1,
+    "sampling": "poisson",
+    "secure_aggregation": true
+  },
+  "secure_aggregation": true,
+  "seed": 20261015,
+  "torch": "2.10.0+cpu",
+  "validity_status": "VALID"
+}

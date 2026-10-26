@@ -1,0 +1,55 @@
+{
+  "audit_standard": "TC-UMIA (Fu et al., 2026) Tri-Population Privacy Audit",
+  "config_path": "configs\\multiclass_cnn_frozen_unlearning_secagg.yaml",
+  "config_sha256": "c42f60b2dd72383089e7c063dbac19d1466510a9cfe6ac363367930ee590023c",
+  "deletion_manifest": "partitions\\generated\\deletion_7da128d9f9d59d50.csv",
+  "deletion_manifest_sha256": "7da128d9f9d59d507e630ea4129e19b7a187d5368618432d93bc79c6cc6c784b",
+  "deletion_requests": [
+    {
+      "client_id": 2,
+      "fraction": 1.0,
+      "request_index": 0
+    }
+  ],
+  "effective_privacy_config": {
+    "clip_norm": 1.0,
+    "delta": 1e-05,
+    "enabled": true,
+    "noise_multiplier": 0.85629173,
+    "population_size": 100,
+    "release_count": 1,
+    "sampling": "poisson",
+    "secure_aggregation": true
+  },
+  "experiment_name": "multiclass_cnn_frozen_unlearning_secagg_eps32_r40_e5",
+  "limitations": [
+    "cifar10_multiclass public-data pilot; exploratory benchmark result, not a SOTA or certified-unlearning claim.",
+    "Fine-tuning accesses retained raw data and is not DP post-processing.",
+    "Tri-population unlearning audit complies with TC-UMIA (Fu et al., 2026) multi-feature protocol.",
+    "Pairwise zero-sum Secure Aggregation active: individual client updates cryptographically concealed."
+  ],
+  "method_privacy_class": {
+    "cached_update_reconstruction_baseline": "incompatible with SecAgg",
+    "dp_only_no_action": "final-model client-DP mechanism as recorded in privacy_ledger.json; compatible with SecAgg",
+    "federated_eraser_baseline": "incompatible with SecAgg",
+    "full_model": "pre-deletion model trained on all clients",
+    "retained_finetune_baseline": "accesses retained raw data after request; compatible with SecAgg",
+    "target_retrain": "internal retained-data retrain reference; compatible with SecAgg"
+  },
+  "platform": "Windows-10-10.0.26200-SP0",
+  "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+  "reference_privacy_config": {
+    "clip_norm": 1.0,
+    "delta": 1e-05,
+    "enabled": true,
+    "noise_multiplier": 0.85629173,
+    "population_size": 99,
+    "release_count": 1,
+    "sampling": "poisson",
+    "secure_aggregation": true
+  },
+  "secure_aggregation": true,
+  "seed": 20260918,
+  "torch": "2.5.1+cu121",
+  "validity_status": "VALID"
+}

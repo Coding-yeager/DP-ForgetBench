@@ -1,0 +1,17 @@
+{
+  "accountant": "dp-accounting RDP accountant; Poisson-sampled Gaussian mechanism",
+  "adjacency": "add/remove one complete client dataset",
+  "aggregation_normalizer": 6.0,
+  "client_sample_rate": 0.5,
+  "clip_norm": 1.0,
+  "delta": 1e-05,
+  "enabled": true,
+  "epsilon": 10.035856509706031,
+  "mechanism_version": "poisson_sum_fixed_public_normalizer_v2",
+  "noise_multiplier": 1.1,
+  "public_population_size": 12,
+  "release_count": 1,
+  "rounds": 10,
+  "sampling": "independent Poisson client participation",
+  "threat_model_note": "Simulator assumes a server-side Gaussian mechanism and protects a final model release. Each round sums clipped client updates, adds Gaussian noise to that sum, and divides by the fixed public normalizer q*N; this matches the Poisson-sampled Gaussian accountant under add/remove-one client adjacency. It is not a production secure-aggregation implementation; releasing additional checkpoints or accessing raw retained data during unlearning requires a revised privacy ledger."
+}
