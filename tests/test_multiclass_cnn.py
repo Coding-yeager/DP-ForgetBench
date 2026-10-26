@@ -25,6 +25,18 @@ class _FakeCIFAR10:
         self.targets = (np.arange(n) % 10).tolist()
 
 
+import sys
+import types
+
+if "torchvision" not in sys.modules:
+    tv_mod = types.ModuleType("torchvision")
+    tv_datasets = types.ModuleType("torchvision.datasets")
+    tv_datasets.CIFAR10 = _FakeCIFAR10
+    tv_mod.datasets = tv_datasets
+    sys.modules["torchvision"] = tv_mod
+    sys.modules["torchvision.datasets"] = tv_datasets
+
+
 def test_make_cifar10_multiclass_federation_shapes_and_determinism() -> None:
     from dp_forgetbench.data import make_cifar10_multiclass_federation
 

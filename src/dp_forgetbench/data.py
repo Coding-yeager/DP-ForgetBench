@@ -84,6 +84,60 @@ def make_synthetic_federation(data_config: dict, seed: int) -> Federation:
     )
 
 
+def _load_cifar10_raw(root: str, download: bool = False) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Load CIFAR-10 data as (train_images, train_labels, test_images, test_labels).
+
+    Tries torchvision if installed; falls back to loading directly from the
+    standard CIFAR-10 python batch files (e.g. root/cifar-10-batches-py).
+    """
+    try:
+        from torchvision.datasets import CIFAR10
+        try:
+            train = CIFAR10(root=root, train=True, download=False)
+            test = CIFAR10(root=root, train=False, download=False)
+        except RuntimeError:
+            if not download:
+                raise
+            train = CIFAR10(root=root, train=True, download=True)
+            test = CIFAR10(root=root, train=False, download=True)
+        return np.asarray(train.data), np.asarray(train.targets), np.asarray(test.data), np.asarray(test.targets)
+    except Exception:
+        import os
+        import pickle
+        cifar_dir = Path(root) / "cifar-10-batches-py"
+        if not cifar_dir.exists():
+            if download:
+                import tarfile
+                import urllib.request
+                Path(root).mkdir(parents=True, exist_ok=True)
+                url = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
+                tar_path = Path(root) / "cifar-10-python.tar.gz"
+                urllib.request.urlretrieve(url, tar_path)
+                with tarfile.open(tar_path, "r:gz") as tar:
+                    tar.extractall(path=root)
+            else:
+                raise RuntimeError(
+                    f"CIFAR-10 dataset not found in {cifar_dir} and download=False. "
+                    "Ensure batches are extracted in data/cifar-10-batches-py or set download: true."
+                )
+        train_batches = []
+        train_targets = []
+        for i in range(1, 6):
+            batch_path = cifar_dir / f"data_batch_{i}"
+            with open(batch_path, "rb") as f:
+                entry = pickle.load(f, encoding="bytes")
+                train_batches.append(entry[b"data"])
+                train_targets.extend(entry[b"labels"])
+        train_data = np.vstack(train_batches).reshape(-1, 3, 32, 32).transpose(0, 2, 3, 1)
+
+        test_path = cifar_dir / "test_batch"
+        with open(test_path, "rb") as f:
+            test_entry = pickle.load(f, encoding="bytes")
+            test_data = test_entry[b"data"].reshape(-1, 3, 32, 32).transpose(0, 2, 3, 1)
+            test_targets = test_entry[b"labels"]
+        return train_data, np.array(train_targets), test_data, np.array(test_targets)
+
+
 def make_cifar10_binary_federation(data_config: dict, seed: int) -> Federation:
     """Create a small, deterministic real-data Phase 1 federation from CIFAR-10.
 
@@ -91,25 +145,14 @@ def make_cifar10_binary_federation(data_config: dict, seed: int) -> Federation:
     model. It verifies public-data loading, deletion, DP accounting, and attacks;
     it is not the final CIFAR-10/CIFAR-100 multi-class benchmark.
     """
-    try:
-        from torchvision.datasets import CIFAR10
-    except ImportError as exc:  # pragma: no cover - environment dependent
-        raise RuntimeError("CIFAR-10 requires torchvision. Install requirements.txt first.") from exc
     root = str(data_config.get("dataset_root", "data"))
     download = bool(data_config.get("download", False))
-    try:
-        train = CIFAR10(root=root, train=True, download=False)
-        test = CIFAR10(root=root, train=False, download=False)
-    except RuntimeError:
-        if not download:
-            raise
-        train = CIFAR10(root=root, train=True, download=True)
-        test = CIFAR10(root=root, train=False, download=True)
+    raw_tr_data, raw_tr_targets, raw_te_data, raw_te_targets = _load_cifar10_raw(root=root, download=download)
     rng = np.random.default_rng(seed)
-    train_images = torch.tensor(np.asarray(train.data), dtype=torch.float32).permute(0, 3, 1, 2) / 255.0
-    train_labels = torch.tensor(np.asarray(train.targets), dtype=torch.long)
-    test_images = torch.tensor(np.asarray(test.data), dtype=torch.float32).permute(0, 3, 1, 2) / 255.0
-    test_labels = torch.tensor(np.asarray(test.targets), dtype=torch.long)
+    train_images = torch.tensor(raw_tr_data, dtype=torch.float32).permute(0, 3, 1, 2) / 255.0
+    train_labels = torch.tensor(raw_tr_targets, dtype=torch.long)
+    test_images = torch.tensor(raw_te_data, dtype=torch.float32).permute(0, 3, 1, 2) / 255.0
+    test_labels = torch.tensor(raw_te_targets, dtype=torch.long)
     train_mask = (train_labels == 0) | (train_labels == 1)
     test_mask = (test_labels == 0) | (test_labels == 1)
     pool_kernel = int(data_config.get("feature_pool_kernel", 1))
@@ -169,25 +212,14 @@ def make_cifar10_multiclass_federation(data_config: dict, seed: int) -> Federati
     This is a Phase 2 backend: it is CPU-usable for smoke tests but is intended
     to be trained on GPU for the full benchmark grid.
     """
-    try:
-        from torchvision.datasets import CIFAR10
-    except ImportError as exc:  # pragma: no cover - environment dependent
-        raise RuntimeError("CIFAR-10 requires torchvision. Install requirements.txt first.") from exc
     root = str(data_config.get("dataset_root", "data"))
     download = bool(data_config.get("download", False))
-    try:
-        train = CIFAR10(root=root, train=True, download=False)
-        test = CIFAR10(root=root, train=False, download=False)
-    except RuntimeError:
-        if not download:
-            raise
-        train = CIFAR10(root=root, train=True, download=True)
-        test = CIFAR10(root=root, train=False, download=True)
+    raw_tr_data, raw_tr_targets, raw_te_data, raw_te_targets = _load_cifar10_raw(root=root, download=download)
     rng = np.random.default_rng(seed)
-    train_images = torch.tensor(np.asarray(train.data), dtype=torch.float32).permute(0, 3, 1, 2) / 255.0
-    train_labels = torch.tensor(np.asarray(train.targets), dtype=torch.long)
-    test_images = torch.tensor(np.asarray(test.data), dtype=torch.float32).permute(0, 3, 1, 2) / 255.0
-    test_labels = torch.tensor(np.asarray(test.targets), dtype=torch.long)
+    train_images = torch.tensor(raw_tr_data, dtype=torch.float32).permute(0, 3, 1, 2) / 255.0
+    train_labels = torch.tensor(raw_tr_targets, dtype=torch.long)
+    test_images = torch.tensor(raw_te_data, dtype=torch.float32).permute(0, 3, 1, 2) / 255.0
+    test_labels = torch.tensor(raw_te_targets, dtype=torch.long)
     # Fixed public per-channel normalization (CIFAR-10 train-set statistics).
     # No learned parameters and no private-data fitting.
     mean = torch.tensor([0.4914, 0.4822, 0.4465]).view(1, 3, 1, 1)

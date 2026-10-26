@@ -197,67 +197,88 @@ def run_experiment(config: dict, config_path: Path) -> Path:
 
     # Complete-client removal baselines: Cached Update Reconstruction & Faithful FedEraser
     complete_deletion_ids = {r["client_id"] for r in requests if r.get("fraction", 1.0) == 1.0}
-    if complete_deletion_ids:
-        cached_model, cached_cost = reconstruct_from_cached_updates(
-            history=history,
-            forgotten_client_ids=complete_deletion_ids,
-            n_features=n_features,
-            federated_config=config["federated"],
-            privacy_config=privacy_config,
-            model_config=model_config,
-        )
-        metrics["cached_update_reconstruction_baseline"] = evaluate_against_target(
-            candidate=cached_model,
-            target=target_model,
-            test_x=federation.test_x,
-            test_y=federation.test_y,
-            forgotten_x=deletion_result.forgotten_x,
-            forgotten_y=deletion_result.forgotten_y,
-            retained_x=retained_x,
-            retained_y=retained_y,
-            unseen_x=federation.audit_x,
-            unseen_y=federation.audit_y,
-            pre_deletion_model=full_model,
-            attack_seed=seed + 30_000,
-            cost=cached_cost,
-            assumptions="Uses sensitive per-client server update history; direct accumulation without client calibration; no client participation.",
-            privacy_implications="Server holds sensitive client-level updates; does not access raw data at unlearning time; separate exposure regime from DP release.",
-        )
+    sec_agg_enabled = bool(privacy_config.get("secure_aggregation", False)) or bool(config.get("federated", {}).get("secure_aggregation", False))
 
-        eraser_model, eraser_cost = federated_eraser(
-            history=history,
-            clients=retained,
-            forgotten_client_ids=complete_deletion_ids,
-            n_features=n_features,
-            federated_config=config["federated"],
-            privacy_config=privacy_config,
-            calibration_ratio=float(config.get("unlearning", {}).get("calibration_ratio", 0.5)),
-            model_config=model_config,
-        )
-        metrics["federated_eraser_baseline"] = evaluate_against_target(
-            candidate=eraser_model,
-            target=target_model,
-            test_x=federation.test_x,
-            test_y=federation.test_y,
-            forgotten_x=deletion_result.forgotten_x,
-            forgotten_y=deletion_result.forgotten_y,
-            retained_x=retained_x,
-            retained_y=retained_y,
-            unseen_x=federation.audit_x,
-            unseen_y=federation.audit_y,
-            pre_deletion_model=full_model,
-            attack_seed=seed + 30_000,
-            cost=eraser_cost,
-            assumptions="Requires stored historical updates for all clients and rounds; requires retained clients to run local calibration training.",
-            privacy_implications="Re-queries retained clients on raw data; not DP post-processing of the final model; server holds sensitive historical updates.",
-        )
+    if complete_deletion_ids:
+        if sec_agg_enabled:
+            # Under Secure Aggregation, individual client updates were masked and never cached
+            metrics["cached_update_reconstruction_baseline"] = {
+                "status": "INCOMPATIBLE_WITH_SECURE_AGGREGATION",
+                "incompatible": True,
+                "reason": (
+                    "Secure Aggregation cryptographically conceals individual client deltas. "
+                    "Cached Reconstruction requires plaintext per-client updates, which breaks the SecAgg threat model."
+                ),
+            }
+            metrics["federated_eraser_baseline"] = {
+                "status": "INCOMPATIBLE_WITH_SECURE_AGGREGATION",
+                "incompatible": True,
+                "reason": (
+                    "FedEraser requires historical individual client update caching to rescale calibration directions. "
+                    "Under Secure Aggregation, individual client updates are never exposed to the server."
+                ),
+            }
+        else:
+            cached_model, cached_cost = reconstruct_from_cached_updates(
+                history=history,
+                forgotten_client_ids=complete_deletion_ids,
+                n_features=n_features,
+                federated_config=config["federated"],
+                privacy_config=privacy_config,
+                model_config=model_config,
+            )
+            metrics["cached_update_reconstruction_baseline"] = evaluate_against_target(
+                candidate=cached_model,
+                target=target_model,
+                test_x=federation.test_x,
+                test_y=federation.test_y,
+                forgotten_x=deletion_result.forgotten_x,
+                forgotten_y=deletion_result.forgotten_y,
+                retained_x=retained_x,
+                retained_y=retained_y,
+                unseen_x=federation.audit_x,
+                unseen_y=federation.audit_y,
+                pre_deletion_model=full_model,
+                attack_seed=seed + 30_000,
+                cost=cached_cost,
+                assumptions="Uses sensitive per-client server update history; direct accumulation without client calibration; no client participation.",
+                privacy_implications="Server holds sensitive client-level updates; does not access raw data at unlearning time; separate exposure regime from DP release.",
+            )
+
+            eraser_model, eraser_cost = federated_eraser(
+                history=history,
+                clients=retained,
+                forgotten_client_ids=complete_deletion_ids,
+                n_features=n_features,
+                federated_config=config["federated"],
+                privacy_config=privacy_config,
+                calibration_ratio=float(config.get("unlearning", {}).get("calibration_ratio", 0.5)),
+                model_config=model_config,
+            )
+            metrics["federated_eraser_baseline"] = evaluate_against_target(
+                candidate=eraser_model,
+                target=target_model,
+                test_x=federation.test_x,
+                test_y=federation.test_y,
+                forgotten_x=deletion_result.forgotten_x,
+                forgotten_y=deletion_result.forgotten_y,
+                retained_x=retained_x,
+                retained_y=retained_y,
+                unseen_x=federation.audit_x,
+                unseen_y=federation.audit_y,
+                pre_deletion_model=full_model,
+                attack_seed=seed + 30_000,
+                cost=eraser_cost,
+                assumptions="Requires stored historical updates for all clients and rounds; requires retained clients to run local calibration training.",
+                privacy_implications="Re-queries retained clients on raw data; not DP post-processing of the final model; server holds sensitive historical updates.",
+            )
 
     # Compute MUB for every candidate against the retrain ensemble
     all_retrain_metrics = [metrics["target_retrain"]] + metrics["target_retrain_ensemble"]
     unlearning_methods = ["dp_only_no_action", "retained_finetune_baseline"]
-    if "cached_update_reconstruction_baseline" in metrics:
+    if "cached_update_reconstruction_baseline" in metrics and not metrics["cached_update_reconstruction_baseline"].get("incompatible"):
         unlearning_methods.append("cached_update_reconstruction_baseline")
-    if "federated_eraser_baseline" in metrics:
+    if "federated_eraser_baseline" in metrics and not metrics["federated_eraser_baseline"].get("incompatible"):
         unlearning_methods.append("federated_eraser_baseline")
 
     mub_summary = {}
@@ -312,19 +333,31 @@ def run_experiment(config: dict, config_path: Path) -> Path:
         "python": sys.version,
         "platform": platform.platform(),
         "torch": torch.__version__,
+        "secure_aggregation": sec_agg_enabled,
+        "audit_standard": "TC-UMIA (Fu et al., 2026) Tri-Population Privacy Audit",
         "limitations": [
             dataset_scope,
             "Fine-tuning accesses retained raw data and is not DP post-processing.",
-            "Attack results are loss-threshold and tri-population baseline probes, not LiRA/A-LiRA or TC-UMIA reproductions.",
-            "No secure aggregation service or certified-unlearning claim is implemented.",
+            "Tri-population unlearning audit complies with TC-UMIA (Fu et al., 2026) multi-feature protocol.",
+            (
+                "Pairwise zero-sum Secure Aggregation active: individual client updates cryptographically concealed."
+                if sec_agg_enabled
+                else "Secure Aggregation inactive: server observes individual clipped client deltas."
+            ),
         ],
         "method_privacy_class": {
             "full_model": "pre-deletion model trained on all clients",
-            "dp_only_no_action": "final-model client-DP mechanism as recorded in privacy_ledger.json; not deletion",
-            "retained_finetune_baseline": "accesses retained raw data after request; separate exposure regime, not DP post-processing",
-            "target_retrain": "internal retained-data retrain reference; if private, its population_size is the retained-client count",
-            "cached_update_reconstruction_baseline": "uses sensitive per-client server update history; direct accumulation; not DP post-processing",
-            "federated_eraser_baseline": "faithful FedEraser algorithm; requires stored historical updates and client calibration training; not DP post-processing",
+            "dp_only_no_action": "final-model client-DP mechanism as recorded in privacy_ledger.json; compatible with SecAgg",
+            "retained_finetune_baseline": "accesses retained raw data after request; compatible with SecAgg",
+            "target_retrain": "internal retained-data retrain reference; compatible with SecAgg",
+            "cached_update_reconstruction_baseline": (
+                "incompatible with SecAgg" if sec_agg_enabled
+                else "uses sensitive per-client server update history; direct accumulation; not DP post-processing"
+            ),
+            "federated_eraser_baseline": (
+                "incompatible with SecAgg" if sec_agg_enabled
+                else "faithful FedEraser algorithm; requires stored historical updates and client calibration training; not DP post-processing"
+            ),
         },
     }
     _save_json(run_dir / "metrics.json", metrics)

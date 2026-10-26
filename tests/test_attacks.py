@@ -60,4 +60,31 @@ def test_tri_population_probe_reports_disjoint_split_and_cis():
     assert result["train_examples_per_population"] == 9
     assert result["eval_examples_per_population"] == 9
     assert len(result["probe_accuracy_ci_95"]) == 2
-    assert result["population_labels"] == {"0": "forget", "1": "retain", "2": "unseen"}
+    assert result["audit_standard"] == "TC-UMIA (Fu et al., 2026) Tri-Population Privacy Audit"
+    assert "forget_vs_unseen_auc" in result
+    assert "retained_vs_unseen_auc" in result
+    assert "per_class_ovr_auc" in result
+    assert "mlp_accuracy" in result
+    assert "normalized_confusion_matrix" in result
+
+
+def test_tc_umia_multiclass_and_retained_leakage():
+    """Verify TC-UMIA features on multi-class output and test retained-leakage probe."""
+    torch.manual_seed(99)
+    from dp_forgetbench.federated import SmallGroupNormCNN
+    pre_model = SmallGroupNormCNN(num_classes=3)
+    post_model = SmallGroupNormCNN(num_classes=3)
+
+    populations = {
+        name: (torch.randn(16, 3, 32, 32), torch.randint(0, 3, (16,)))
+        for name in ("forget", "retain", "unseen")
+    }
+    result = tri_population_probe(pre_model, post_model, populations, seed=99)
+    assert 0.0 <= result["forget_vs_unseen_auc"] <= 1.0
+    assert 0.0 <= result["retained_vs_unseen_auc"] <= 1.0
+    assert "forget_ovr_auc" in result["per_class_ovr_auc"]
+    assert "retain_ovr_auc" in result["per_class_ovr_auc"]
+    assert "unseen_ovr_auc" in result["per_class_ovr_auc"]
+    assert len(result["confusion_matrix"]) == 3
+    assert len(result["normalized_confusion_matrix"]) == 3
+

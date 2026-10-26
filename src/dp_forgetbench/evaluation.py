@@ -24,10 +24,6 @@ def _predictive_distribution(logits: torch.Tensor) -> torch.Tensor:
 
 def js_divergence_to_target(candidate: nn.Module, target: nn.Module, x: torch.Tensor) -> float:
     """Mean Jensen-Shannon divergence between two models' predictive distributions."""
-    device = get_device()
-    candidate = candidate.to(device)
-    target = target.to(device)
-    x = x.to(device)
     p_dist = _predictive_distribution(flatten_logits(candidate, x))
     q_dist = _predictive_distribution(flatten_logits(target, x))
     midpoint = 0.5 * (p_dist + q_dist)

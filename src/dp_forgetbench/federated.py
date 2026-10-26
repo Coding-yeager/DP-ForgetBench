@@ -117,24 +117,86 @@ class TrainCost:
         }
 
 
+class IncompatibleSecurityRegimeError(RuntimeError):
+    """Raised when an unlearning method violates the active security or privacy contract (e.g. Secure Aggregation)."""
+    pass
+
+
+class SecureAggregator:
+    """Cryptographic simulator for Pairwise Zero-Sum Masking Secure Aggregation (Bonawitz et al., 2017).
+
+    Under Secure Aggregation:
+    1. Participating clients generate pairwise random blinding masks P_{i,j} = -P_{j,i}.
+    2. Client i adds its sum of masks to its local clipped delta:
+         tilde_delta_i = delta_i + sum_{j != i} P_{i, j}
+    3. The central server receives only masked updates tilde_delta_i and sums them.
+       All masks cancel out exactly:
+         sum_i tilde_delta_i == sum_i delta_i
+    4. The server NEVER observes or stores individual plaintext updates delta_i.
+    """
+
+    @staticmethod
+    def aggregate_masked(
+        deltas_by_client: dict[int, dict[str, torch.Tensor]],
+        rng: np.random.Generator,
+    ) -> dict[str, torch.Tensor]:
+        client_ids = list(deltas_by_client.keys())
+        if not client_ids:
+            return {}
+        if len(client_ids) == 1:
+            return {name: val.detach().clone() for name, val in deltas_by_client[client_ids[0]].items()}
+
+        param_names = list(deltas_by_client[client_ids[0]].keys())
+        pairwise_masks: dict[tuple[int, int], dict[str, torch.Tensor]] = {}
+
+        for i_idx, c_i in enumerate(client_ids):
+            for c_j in client_ids[i_idx + 1:]:
+                pair_seed = int(rng.integers(0, 2**31 - 1))
+                pair_gen = torch.Generator().manual_seed(pair_seed)
+                mask_ij = {}
+                mask_ji = {}
+                for name in param_names:
+                    ref_tensor = deltas_by_client[c_i][name]
+                    noise = torch.randn(ref_tensor.shape, generator=pair_gen, dtype=ref_tensor.dtype).to(ref_tensor.device)
+                    mask_ij[name] = noise
+                    mask_ji[name] = -noise
+                pairwise_masks[(c_i, c_j)] = mask_ij
+                pairwise_masks[(c_j, c_i)] = mask_ji
+
+        masked_updates = []
+        for c_i in client_ids:
+            client_masked = {}
+            for name in param_names:
+                total_mask = sum(pairwise_masks[(c_i, c_j)][name] for c_j in client_ids if c_j != c_i)
+                client_masked[name] = deltas_by_client[c_i][name] + total_mask
+            masked_updates.append(client_masked)
+
+        aggregate = {}
+        for name in param_names:
+            aggregate[name] = torch.stack([mu[name] for mu in masked_updates]).sum(dim=0)
+        return aggregate
+
+
 @dataclass
 class RoundHistory:
     selected_client_ids: tuple[int, ...]
-    deltas_by_client: dict[int, dict[str, torch.Tensor]]
+    deltas_by_client: dict[int, dict[str, torch.Tensor]] | None
     gaussian_noise: dict[str, torch.Tensor] | None
+    aggregate_delta: dict[str, torch.Tensor] | None = None
 
 
 @dataclass
 class FederatedHistory:
     """Private server-side training history for a direct-accumulation FU baseline.
 
-    Individual client updates are sensitive server artifacts. This object is kept
-    only in memory in the pilot; using it for unlearning is not DP post-processing
-    of the final released model and its storage cost is reported.
+    Individual client updates are sensitive server artifacts. Under Secure
+    Aggregation, deltas_by_client is None because individual client updates are
+    never revealed to the server.
     """
 
     initial_state: dict[str, torch.Tensor] | None = None
     rounds: list[RoundHistory] | None = None
+    secure_aggregation: bool = False
 
     def __post_init__(self) -> None:
         if self.rounds is None:
@@ -143,16 +205,23 @@ class FederatedHistory:
     def storage_bytes(self) -> int:
         total = 0
         for round_record in self.rounds or []:
-            for delta in round_record.deltas_by_client.values():
-                total += sum(value.numel() * value.element_size() for value in delta.values())
+            if round_record.deltas_by_client is not None:
+                for delta in round_record.deltas_by_client.values():
+                    total += sum(value.numel() * value.element_size() for value in delta.values())
+            elif round_record.aggregate_delta is not None:
+                total += sum(value.numel() * value.element_size() for value in round_record.aggregate_delta.values())
             if round_record.gaussian_noise is not None:
                 total += sum(value.numel() * value.element_size() for value in round_record.gaussian_noise.values())
         return total
 
 
 def set_seed(seed: int) -> None:
+    import os
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     np.random.seed(seed)
     torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
     torch.use_deterministic_algorithms(True, warn_only=True)
 
 
@@ -161,7 +230,7 @@ def clone_state(model: nn.Module) -> dict[str, torch.Tensor]:
 
 
 def state_delta(new_state: dict[str, torch.Tensor], old_state: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-    return {name: new_state[name] - old_state[name] for name in old_state}
+    return {name: new_state[name] - old_state[name].to(new_state[name].device) for name in old_state}
 
 
 def get_device() -> torch.device:
@@ -186,7 +255,8 @@ def _local_update(
     # Ensure global_state is on the correct device when loading
     model.load_state_dict({k: v.to(device) for k, v in global_state.items()})
     model.train()
-    optimizer = torch.optim.SGD(model.parameters(), lr=float(config["learning_rate"]))
+    lr = float(config.get("learning_rate", config.get("local_lr", 0.05)))
+    optimizer = torch.optim.SGD(model.parameters(), lr=lr)
     batch_size = int(config["local_batch_size"])
     for _ in range(int(config["local_epochs"])):
         for start in range(0, len(client.y), batch_size):
@@ -238,6 +308,7 @@ def train_federated(
     client_ids = sorted(clients)
     sample_rate = float(federated_config["client_sample_rate"])
     private = bool(privacy_config["enabled"])
+    sec_agg = bool(privacy_config.get("secure_aggregation", False)) or bool(federated_config.get("secure_aggregation", False))
     clip_norm = float(privacy_config["clip_norm"]) if private else None
     noise_multiplier = float(privacy_config["noise_multiplier"]) if private else 0.0
     normalizer = float(privacy_config["population_size"]) * sample_rate if private else None
@@ -260,8 +331,18 @@ def train_federated(
             cost.client_updates += 1
             cost.local_examples += len(clients[client_id].y) * int(federated_config["local_epochs"])
         round_noise: dict[str, torch.Tensor] | None = {} if private else None
+
+        # Secure Aggregation: pairwise zero-sum masking conceals individual deltas from server
+        if sec_agg and selected:
+            deltas_dict = {client_id: delta for client_id, delta in zip(selected, deltas)}
+            raw_aggregate = SecureAggregator.aggregate_masked(deltas_dict, rng)
+        else:
+            raw_aggregate = {}
+            for name in global_state:
+                raw_aggregate[name] = torch.stack([delta[name] for delta in deltas]).sum(dim=0) if deltas else torch.zeros_like(global_state[name])
+
         for name in global_state:
-            aggregate = torch.stack([delta[name] for delta in deltas]).sum(dim=0) if deltas else torch.zeros_like(global_state[name])
+            aggregate = raw_aggregate[name] if name in raw_aggregate else torch.zeros_like(global_state[name])
             if private:
                 noise = torch.randn_like(aggregate) * (noise_multiplier * clip_norm)
                 round_noise[name] = noise.detach().clone()
@@ -272,13 +353,24 @@ def train_federated(
             cost.communicated_bytes += sum(delta[name].numel() * delta[name].element_size() for delta in deltas)
         model.load_state_dict(global_state)
         if history is not None:
-            history.rounds.append(
-                RoundHistory(
-                    selected_client_ids=tuple(selected),
-                    deltas_by_client={client_id: {name: value.detach().clone() for name, value in delta.items()} for client_id, delta in zip(selected, deltas)},
-                    gaussian_noise=round_noise,
+            if sec_agg:
+                history.secure_aggregation = True
+                history.rounds.append(
+                    RoundHistory(
+                        selected_client_ids=tuple(selected),
+                        deltas_by_client=None,
+                        gaussian_noise=round_noise,
+                        aggregate_delta={name: raw_aggregate[name].detach().clone() for name in raw_aggregate},
+                    )
                 )
-            )
+            else:
+                history.rounds.append(
+                    RoundHistory(
+                        selected_client_ids=tuple(selected),
+                        deltas_by_client={client_id: {name: value.detach().clone() for name, value in delta.items()} for client_id, delta in zip(selected, deltas)},
+                        gaussian_noise=round_noise,
+                    )
+                )
     cost.runtime_seconds = time.perf_counter() - start_time
     if history is not None:
         cost.persistent_storage_bytes = history.storage_bytes()
@@ -303,6 +395,11 @@ def reconstruct_from_cached_updates(
     """
     if history.initial_state is None or not history.rounds:
         raise ValueError("Cached-update reconstruction requires a non-empty training history.")
+    if history.secure_aggregation or any(r.deltas_by_client is None for r in history.rounds):
+        raise IncompatibleSecurityRegimeError(
+            "Cached Reconstruction requires individual client historical updates, "
+            "which are cryptographically hidden and strictly unavailable under Secure Aggregation."
+        )
     start_time = time.perf_counter()
     device = get_device()
     private = bool(privacy_config["enabled"])
@@ -360,6 +457,11 @@ def federated_eraser(
     """
     if history.initial_state is None or not history.rounds:
         raise ValueError("FedEraser requires a non-empty training history with initial state.")
+    if history.secure_aggregation or any(r.deltas_by_client is None for r in history.rounds):
+        raise IncompatibleSecurityRegimeError(
+            "FedEraser requires historical individual client update directions and magnitudes, "
+            "which violates Secure Aggregation privacy guarantees."
+        )
 
     start_time = time.perf_counter()
     device = get_device()
@@ -467,13 +569,19 @@ def finetune_retained(
     )
 
 
-def flatten_logits(model: nn.Module, x: torch.Tensor) -> torch.Tensor:
+def flatten_logits(model: nn.Module, x: torch.Tensor, batch_size: int = 512) -> torch.Tensor:
     device = get_device()
-    x = x.to(device)
     model = model.to(device)
     model.eval()
+    if len(x) <= batch_size:
+        with torch.no_grad():
+            return model(x.to(device)).detach().cpu()
+    outputs = []
     with torch.no_grad():
-        return model(x).detach().cpu()
+        for i in range(0, len(x), batch_size):
+            batch_x = x[i : i + batch_size].to(device)
+            outputs.append(model(batch_x).detach().cpu())
+    return torch.cat(outputs, dim=0) if outputs else torch.empty(0)
 
 
 def evaluate_loss_accuracy(model: nn.Module, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
@@ -481,7 +589,6 @@ def evaluate_loss_accuracy(model: nn.Module, x: torch.Tensor, y: torch.Tensor) -
     model = model.to(device)
     model.eval()
     with torch.no_grad():
-        x = x.to(device)
         logits = flatten_logits(model, x)
         loss = _per_example_loss(logits, y.cpu()).mean().item()
     accuracy = _accuracy(logits, y.cpu()).item()
