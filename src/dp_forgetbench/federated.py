@@ -248,10 +248,16 @@ def clip_delta(delta: dict[str, torch.Tensor], clip_norm: float) -> dict[str, to
 
 
 def _local_update(
-    global_state: dict[str, torch.Tensor], client: ClientDataset, config: dict, n_features: int, model_config: dict | None
+    global_state: dict[str, torch.Tensor],
+    client: ClientDataset,
+    config: dict,
+    n_features: int | None = None,
+    model_config: dict | None = None,
+    model: nn.Module | None = None,
 ) -> dict[str, torch.Tensor]:
     device = get_device()
-    model = make_model(model_config, n_features).to(device)
+    if model is None:
+        model = make_model(model_config, n_features).to(device)
     # Ensure global_state is on the correct device when loading
     model.load_state_dict({k: v.to(device) for k, v in global_state.items()})
     model.train()
@@ -266,7 +272,9 @@ def _local_update(
             loss = _per_example_loss(model(x), y).mean()
             loss.backward()
             optimizer.step()
-    return state_delta(clone_state(model), global_state)
+    trainable_names = {name for name, p in model.named_parameters() if p.requires_grad}
+    new_state = clone_state(model)
+    return {name: new_state[name] - global_state[name].to(new_state[name].device) for name in trainable_names}
 
 
 def _sample_clients(client_ids: list[int], sample_rate: float, generator: np.random.Generator) -> list[int]:
@@ -277,13 +285,14 @@ def _sample_clients(client_ids: list[int], sample_rate: float, generator: np.ran
 def train_federated(
     *,
     clients: dict[int, ClientDataset],
-    n_features: int,
+    n_features: int | None = None,
     federated_config: dict,
     privacy_config: dict,
     seed: int,
     initial_state: dict[str, torch.Tensor] | None = None,
     history: FederatedHistory | None = None,
     model_config: dict | None = None,
+    model: nn.Module | None = None,
 ) -> tuple[nn.Module, TrainCost]:
     """Train with an accountant-aligned Poisson-subsampled Gaussian mechanism.
 
@@ -297,7 +306,12 @@ def train_federated(
     set_seed(seed)
     rng = np.random.default_rng(seed)
     device = get_device()
-    model = make_model(model_config, n_features).to(device)
+    if model is not None:
+        model = model.to(device)
+        local_model = deepcopy(model).to(device)
+    else:
+        model = make_model(model_config, n_features).to(device)
+        local_model = make_model(model_config, n_features).to(device)
     if initial_state is not None:
         model.load_state_dict({k: v.to(device) for k, v in initial_state.items()})
     global_state = clone_state(model)
@@ -317,6 +331,7 @@ def train_federated(
     cost = TrainCost()
     start_time = time.perf_counter()
 
+    trainable_names = {name for name, p in model.named_parameters() if p.requires_grad}
     for _round in range(int(federated_config["rounds"])):
         selected = _sample_clients(client_ids, sample_rate, rng)
         cost.rounds += 1
@@ -324,7 +339,9 @@ def train_federated(
             continue
         deltas = []
         for client_id in selected:
-            delta = _local_update(global_state, clients[client_id], federated_config, n_features, model_config)
+            delta = _local_update(
+                global_state, clients[client_id], federated_config, n_features, model_config, model=local_model
+            )
             if private:
                 delta = clip_delta(delta, clip_norm)
             deltas.append(delta)
@@ -338,10 +355,10 @@ def train_federated(
             raw_aggregate = SecureAggregator.aggregate_masked(deltas_dict, rng)
         else:
             raw_aggregate = {}
-            for name in global_state:
+            for name in trainable_names:
                 raw_aggregate[name] = torch.stack([delta[name] for delta in deltas]).sum(dim=0) if deltas else torch.zeros_like(global_state[name])
 
-        for name in global_state:
+        for name in trainable_names:
             aggregate = raw_aggregate[name] if name in raw_aggregate else torch.zeros_like(global_state[name])
             if private:
                 noise = torch.randn_like(aggregate) * (noise_multiplier * clip_norm)
@@ -350,7 +367,7 @@ def train_federated(
             else:
                 aggregate = aggregate / len(selected)
             global_state[name] = global_state[name] + aggregate
-            cost.communicated_bytes += sum(delta[name].numel() * delta[name].element_size() for delta in deltas)
+            cost.communicated_bytes += sum(delta[name].numel() * delta[name].element_size() for delta in deltas if name in delta)
         model.load_state_dict(global_state)
         if history is not None:
             if sec_agg:
@@ -542,34 +559,47 @@ def federated_eraser(
 
 def finetune_retained(
     *,
-    full_model: nn.Module,
-    clients: dict[int, ClientDataset],
-    n_features: int,
+    full_model: nn.Module | None = None,
+    model: nn.Module | None = None,
+    clients: dict[int, ClientDataset] | None = None,
+    retained_clients: dict[int, ClientDataset] | None = None,
+    n_features: int | None = None,
     federated_config: dict,
-    unlearning_rounds: int,
+    unlearning_rounds: int | None = None,
     seed: int,
     model_config: dict | None = None,
+    privacy_config: dict | None = None,
 ) -> tuple[nn.Module, TrainCost]:
     """A labelled baseline, not a certified unlearning procedure.
 
     It accesses retained raw data. Its output therefore has a distinct privacy
     exposure from pure post-processing; callers must keep this distinction visible.
     """
+    base_model = full_model if full_model is not None else model
+    if base_model is None:
+        raise ValueError("finetune_retained requires full_model or model.")
+    client_dict = clients if clients is not None else retained_clients
+    if client_dict is None:
+        raise ValueError("finetune_retained requires clients or retained_clients.")
     updated_config = deepcopy(federated_config)
-    updated_config["rounds"] = int(unlearning_rounds)
-    non_private = {"enabled": False}
+    if unlearning_rounds is not None:
+        updated_config["rounds"] = int(unlearning_rounds)
+    elif "rounds" not in updated_config:
+        updated_config["rounds"] = 4
+    priv_cfg = privacy_config if privacy_config is not None else {"enabled": False}
     return train_federated(
-        clients=clients,
+        clients=client_dict,
         n_features=n_features,
         federated_config=updated_config,
-        privacy_config=non_private,
+        privacy_config=priv_cfg,
         seed=seed,
-        initial_state=clone_state(full_model),
+        initial_state=clone_state(base_model),
         model_config=model_config,
+        model=base_model,
     )
 
 
-def flatten_logits(model: nn.Module, x: torch.Tensor, batch_size: int = 512) -> torch.Tensor:
+def flatten_logits(model: nn.Module, x: torch.Tensor, batch_size: int = 128) -> torch.Tensor:
     device = get_device()
     model = model.to(device)
     model.eval()

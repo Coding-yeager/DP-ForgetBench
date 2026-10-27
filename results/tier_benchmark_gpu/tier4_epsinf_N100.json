@@ -1,0 +1,66 @@
+{
+  "summary": {
+    "tier": 4,
+    "tier_name": "Frozen MobileNetV3-Small + LoRA-16 Head",
+    "epsilon_target": Infinity,
+    "epsilon_actual": Infinity,
+    "n_clients": 100,
+    "mean_accuracy": 0.15889999270439148,
+    "sd_accuracy": 0.0,
+    "n_valid_seeds": 1,
+    "n_total_seeds": 3
+  },
+  "seed_results": [
+    {
+      "tier": 4,
+      "seed": 42,
+      "test_accuracy": 0.15889999270439148,
+      "test_loss": 2.271188497543335,
+      "forget_accuracy": 0.06499999761581421,
+      "runtime_s": 85.51080769998953,
+      "method": "dp_only",
+      "epsilon_target": Infinity,
+      "epsilon_actual": Infinity,
+      "noise_multiplier": 0.0,
+      "n_clients": 100,
+      "rounds": 40,
+      "local_epochs": 5,
+      "tier_name": "Frozen MobileNetV3-Small + LoRA-16 Head",
+      "valid": true
+    },
+    {
+      "tier": 4,
+      "seed": 142,
+      "test_accuracy": 0.1298999935388565,
+      "test_loss": 2.371190071105957,
+      "forget_accuracy": 0.02250000089406967,
+      "runtime_s": 83.7496947000036,
+      "method": "dp_only",
+      "epsilon_target": Infinity,
+      "epsilon_actual": Infinity,
+      "noise_multiplier": 0.0,
+      "n_clients": 100,
+      "rounds": 40,
+      "local_epochs": 5,
+      "tier_name": "Frozen MobileNetV3-Small + LoRA-16 Head",
+      "valid": false
+    },
+    {
+      "tier": 4,
+      "seed": 242,
+      "test_accuracy": 0.1378999948501587,
+      "test_loss": 2.3156509399414062,
+      "forget_accuracy": 0.11999999731779099,
+      "runtime_s": 86.55672219998087,
+      "method": "dp_only",
+      "epsilon_target": Infinity,
+      "epsilon_actual": Infinity,
+      "noise_multiplier": 0.0,
+      "n_clients": 100,
+      "rounds": 40,
+      "local_epochs": 5,
+      "tier_name": "Frozen MobileNetV3-Small + LoRA-16 Head",
+      "valid": false
+    }
+  ]
+}

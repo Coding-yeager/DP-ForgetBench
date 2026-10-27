@@ -7,3 +7,4 @@ partitions/generated/*
 reports/*.pdf
 !reports/.gitkeep
 data/
+scratch/

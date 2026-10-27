@@ -22,14 +22,23 @@ def _predictive_distribution(logits: torch.Tensor) -> torch.Tensor:
     return torch.softmax(logits, dim=-1).clamp(1e-7, 1.0)
 
 
+def js_divergence(p_dist: torch.Tensor, q_dist: torch.Tensor) -> float:
+    """Mean Jensen-Shannon divergence between two distributions / probability tensors."""
+    p_dist = p_dist.clamp(1e-7, 1.0)
+    q_dist = q_dist.clamp(1e-7, 1.0)
+    p_dist = p_dist / p_dist.sum(dim=-1, keepdim=True)
+    q_dist = q_dist / q_dist.sum(dim=-1, keepdim=True)
+    midpoint = 0.5 * (p_dist + q_dist)
+    kl_p = (p_dist * (p_dist.log() - midpoint.log())).sum(dim=-1)
+    kl_q = (q_dist * (q_dist.log() - midpoint.log())).sum(dim=-1)
+    return float((0.5 * (kl_p + kl_q)).mean().item())
+
+
 def js_divergence_to_target(candidate: nn.Module, target: nn.Module, x: torch.Tensor) -> float:
     """Mean Jensen-Shannon divergence between two models' predictive distributions."""
     p_dist = _predictive_distribution(flatten_logits(candidate, x))
     q_dist = _predictive_distribution(flatten_logits(target, x))
-    midpoint = 0.5 * (p_dist + q_dist)
-    kl_p = (p_dist * (p_dist.log() - midpoint.log())).sum(dim=1)
-    kl_q = (q_dist * (q_dist.log() - midpoint.log())).sum(dim=1)
-    return float((0.5 * (kl_p + kl_q)).mean().item())
+    return js_divergence(p_dist, q_dist)
 
 
 import numpy as np

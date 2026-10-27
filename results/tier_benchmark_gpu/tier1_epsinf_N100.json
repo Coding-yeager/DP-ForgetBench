@@ -1,0 +1,66 @@
+{
+  "summary": {
+    "tier": 1,
+    "tier_name": "HaarScatter + Linear Head",
+    "epsilon_target": Infinity,
+    "epsilon_actual": Infinity,
+    "n_clients": 100,
+    "mean_accuracy": 0.27989999453226727,
+    "sd_accuracy": 0.010941201871403003,
+    "n_valid_seeds": 3,
+    "n_total_seeds": 3
+  },
+  "seed_results": [
+    {
+      "tier": 1,
+      "seed": 42,
+      "test_accuracy": 0.29249998927116394,
+      "test_loss": 1.9334205389022827,
+      "forget_accuracy": 0.18250000476837158,
+      "runtime_s": 61.623622200015234,
+      "method": "dp_only",
+      "epsilon_target": Infinity,
+      "epsilon_actual": Infinity,
+      "noise_multiplier": 0.0,
+      "n_clients": 100,
+      "rounds": 40,
+      "local_epochs": 5,
+      "tier_name": "HaarScatter + Linear Head",
+      "valid": true
+    },
+    {
+      "tier": 1,
+      "seed": 142,
+      "test_accuracy": 0.274399995803833,
+      "test_loss": 1.962744116783142,
+      "forget_accuracy": 0.12999999523162842,
+      "runtime_s": 42.083860000013374,
+      "method": "dp_only",
+      "epsilon_target": Infinity,
+      "epsilon_actual": Infinity,
+      "noise_multiplier": 0.0,
+      "n_clients": 100,
+      "rounds": 40,
+      "local_epochs": 5,
+      "tier_name": "HaarScatter + Linear Head",
+      "valid": true
+    },
+    {
+      "tier": 1,
+      "seed": 242,
+      "test_accuracy": 0.2727999985218048,
+      "test_loss": 1.964163899421692,
+      "forget_accuracy": 0.20499999821186066,
+      "runtime_s": 43.6044816999929,
+      "method": "dp_only",
+      "epsilon_target": Infinity,
+      "epsilon_actual": Infinity,
+      "noise_multiplier": 0.0,
+      "n_clients": 100,
+      "rounds": 40,
+      "local_epochs": 5,
+      "tier_name": "HaarScatter + Linear Head",
+      "valid": true
+    }
+  ]
+}

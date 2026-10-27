@@ -1,0 +1,66 @@
+{
+  "summary": {
+    "tier": 2,
+    "tier_name": "Frozen MobileNetV3-Small + Linear Head",
+    "epsilon_target": Infinity,
+    "epsilon_actual": Infinity,
+    "n_clients": 100,
+    "mean_accuracy": 0.3697999914487203,
+    "sd_accuracy": 0.011494342661728085,
+    "n_valid_seeds": 3,
+    "n_total_seeds": 3
+  },
+  "seed_results": [
+    {
+      "tier": 2,
+      "seed": 42,
+      "test_accuracy": 0.382999986410141,
+      "test_loss": 1.738831877708435,
+      "forget_accuracy": 0.2775000035762787,
+      "runtime_s": 71.3196692999918,
+      "method": "dp_only",
+      "epsilon_target": Infinity,
+      "epsilon_actual": Infinity,
+      "noise_multiplier": 0.0,
+      "n_clients": 100,
+      "rounds": 40,
+      "local_epochs": 5,
+      "tier_name": "Frozen MobileNetV3-Small + Linear Head",
+      "valid": true
+    },
+    {
+      "tier": 2,
+      "seed": 142,
+      "test_accuracy": 0.3643999993801117,
+      "test_loss": 1.7731902599334717,
+      "forget_accuracy": 0.1899999976158142,
+      "runtime_s": 68.99964290001662,
+      "method": "dp_only",
+      "epsilon_target": Infinity,
+      "epsilon_actual": Infinity,
+      "noise_multiplier": 0.0,
+      "n_clients": 100,
+      "rounds": 40,
+      "local_epochs": 5,
+      "tier_name": "Frozen MobileNetV3-Small + Linear Head",
+      "valid": true
+    },
+    {
+      "tier": 2,
+      "seed": 242,
+      "test_accuracy": 0.3619999885559082,
+      "test_loss": 1.7834011316299438,
+      "forget_accuracy": 0.35499998927116394,
+      "runtime_s": 72.00699549997807,
+      "method": "dp_only",
+      "epsilon_target": Infinity,
+      "epsilon_actual": Infinity,
+      "noise_multiplier": 0.0,
+      "n_clients": 100,
+      "rounds": 40,
+      "local_epochs": 5,
+      "tier_name": "Frozen MobileNetV3-Small + Linear Head",
+      "valid": true
+    }
+  ]
+}

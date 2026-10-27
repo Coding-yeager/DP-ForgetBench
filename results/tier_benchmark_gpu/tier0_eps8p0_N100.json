@@ -1,0 +1,66 @@
+{
+  "summary": {
+    "tier": 0,
+    "tier_name": "SmallGroupNormCNN (from scratch)",
+    "epsilon_target": 8.0,
+    "epsilon_actual": NaN,
+    "n_clients": 100,
+    "mean_accuracy": 0.0,
+    "sd_accuracy": 0.0,
+    "n_valid_seeds": 0,
+    "n_total_seeds": 3
+  },
+  "seed_results": [
+    {
+      "tier": 0,
+      "seed": 42,
+      "test_accuracy": 0.11420000344514847,
+      "test_loss": 52401.8359375,
+      "forget_accuracy": 0.08250000327825546,
+      "runtime_s": 103.90396940000937,
+      "method": "dp_only",
+      "epsilon_target": 8.0,
+      "epsilon_actual": NaN,
+      "noise_multiplier": 200.0,
+      "n_clients": 100,
+      "rounds": 40,
+      "local_epochs": 5,
+      "tier_name": "SmallGroupNormCNN (from scratch)",
+      "valid": false
+    },
+    {
+      "tier": 0,
+      "seed": 142,
+      "test_accuracy": 0.09149999916553497,
+      "test_loss": 42635.0703125,
+      "forget_accuracy": 0.054999999701976776,
+      "runtime_s": 120.98846150000463,
+      "method": "dp_only",
+      "epsilon_target": 8.0,
+      "epsilon_actual": NaN,
+      "noise_multiplier": 200.0,
+      "n_clients": 100,
+      "rounds": 40,
+      "local_epochs": 5,
+      "tier_name": "SmallGroupNormCNN (from scratch)",
+      "valid": false
+    },
+    {
+      "tier": 0,
+      "seed": 242,
+      "test_accuracy": 0.1071000024676323,
+      "test_loss": 43764.7578125,
+      "forget_accuracy": 0.08500000089406967,
+      "runtime_s": 137.96670339998673,
+      "method": "dp_only",
+      "epsilon_target": 8.0,
+      "epsilon_actual": NaN,
+      "noise_multiplier": 200.0,
+      "n_clients": 100,
+      "rounds": 40,
+      "local_epochs": 5,
+      "tier_name": "SmallGroupNormCNN (from scratch)",
+      "valid": false
+    }
+  ]
+}
